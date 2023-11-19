@@ -235,9 +235,7 @@ class Milvus(VectorStore):
         self._create_search_params()
         self._load()
 
-    def _create_collection(
-        self, embeddings: list, metadatas: Optional[list[dict]] = None
-    ) -> None:
+    def _create_collection(self, embeddings: list, metadatas: Optional[list[dict]] = None) -> None:
         from pymilvus import (
             Collection,
             CollectionSchema,
@@ -257,12 +255,22 @@ class Milvus(VectorStore):
                 # Infer the corresponding datatype of the metadata
                 dtype = infer_dtype_bydata(value)
                 # Datatype isn't compatible
-                if dtype == DataType.UNKNOWN or dtype == DataType.NONE:
+                if dtype == DataType.NONE:
                     logger.error(
                         "Failure to create collection, unrecognized dtype for key: %s",
                         key,
                     )
                     raise ValueError(f"Unrecognized datatype for {key}.")
+                elif dtype == DataType.UNKNOWN:
+                    fields.append(
+                        FieldSchema(
+                            key,
+                            DataType.ARRAY,
+                            element_type=DataType.VARCHAR,
+                            max_capacity=900,
+                            max_length=65_535,
+                        )
+                    )
                 # Dataype is a string/varchar equivalent
                 elif dtype == DataType.VARCHAR:
                     fields.append(FieldSchema(key, DataType.VARCHAR, max_length=65_535))
@@ -270,19 +278,13 @@ class Milvus(VectorStore):
                     fields.append(FieldSchema(key, dtype))
 
         # Create the text field
-        fields.append(
-            FieldSchema(self._text_field, DataType.VARCHAR, max_length=65_535)
-        )
+        fields.append(FieldSchema(self._text_field, DataType.VARCHAR, max_length=65_535))
         # Create the primary key field
         fields.append(
-            FieldSchema(
-                self._primary_field, DataType.INT64, is_primary=True, auto_id=True
-            )
+            FieldSchema(self._primary_field, DataType.INT64, is_primary=True, auto_id=True)
         )
         # Create the vector field, supports binary or float vectors
-        fields.append(
-            FieldSchema(self._vector_field, infer_dtype_bydata(embeddings[0]), dim=dim)
-        )
+        fields.append(FieldSchema(self._vector_field, infer_dtype_bydata(embeddings[0]), dim=dim))
 
         # Create the schema for the collection
         schema = CollectionSchema(fields)
@@ -296,9 +298,7 @@ class Milvus(VectorStore):
                 using=self.alias,
             )
         except MilvusException as e:
-            logger.error(
-                "Failed to create collection: %s error: %s", self.collection_name, e
-            )
+            logger.error("Failed to create collection: %s error: %s", self.collection_name, e)
             raise e
 
     def _extract_fields(self) -> None:
@@ -362,9 +362,7 @@ class Milvus(VectorStore):
                 )
 
             except MilvusException as e:
-                logger.error(
-                    "Failed to create an index on collection: %s", self.collection_name
-                )
+                logger.error("Failed to create an index on collection: %s", self.collection_name)
                 raise e
 
     def _create_search_params(self) -> None:
@@ -467,9 +465,7 @@ class Milvus(VectorStore):
                 res = self.col.insert(insert_list, timeout=timeout, **kwargs)
                 pks.extend(res.primary_keys)
             except MilvusException as e:
-                logger.error(
-                    "Failed to insert batch starting at entity: %s/%s", i, total_count
-                )
+                logger.error("Failed to insert batch starting at entity: %s/%s", i, total_count)
                 raise e
         return pks
 
